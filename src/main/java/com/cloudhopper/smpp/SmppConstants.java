@@ -52,10 +52,12 @@ public class SmppConstants {
     public static final long DEFAULT_CONNECT_TIMEOUT = 10000;
     public static final long DEFAULT_BIND_TIMEOUT = 5000;
     public static final long DEFAULT_REQUEST_EXPIRY_TIMEOUT = -1;   // disabled
+    public static final long DEFAULT_ENQUIRE_LINK_TIMER = 500;
     public static final long DEFAULT_WINDOW_MONITOR_INTERVAL = -1;  // disabled
     public static final int DEFAULT_SERVER_MAX_CONNECTION_SIZE = 100;
     public static final boolean DEFAULT_SERVER_NON_BLOCKING_SOCKETS_ENABLED = true;
     public static final boolean DEFAULT_SERVER_REUSE_ADDRESS = true;
+    public static final boolean DEFAULT_USE_AUTOMATIC_ENQUIRE_LINK = false; 
 
     //
     // SUBMIT_MULTI destination type flags

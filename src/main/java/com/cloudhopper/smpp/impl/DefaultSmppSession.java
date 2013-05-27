@@ -20,8 +20,23 @@ package com.cloudhopper.smpp.impl;
  * #L%
  */
 
+import java.lang.management.ManagementFactory;
+import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
+import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.management.ObjectName;
+
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudhopper.commons.util.PeriodFormatterUtil;
-import com.cloudhopper.smpp.jmx.DefaultSmppSessionMXBean;
 import com.cloudhopper.commons.util.windowing.DuplicateKeyException;
 import com.cloudhopper.commons.util.windowing.OfferTimeoutException;
 import com.cloudhopper.commons.util.windowing.Window;
@@ -30,11 +45,11 @@ import com.cloudhopper.commons.util.windowing.WindowListener;
 import com.cloudhopper.smpp.SmppBindType;
 import com.cloudhopper.smpp.SmppConstants;
 import com.cloudhopper.smpp.SmppServerSession;
-import com.cloudhopper.smpp.type.SmppChannelException;
 import com.cloudhopper.smpp.SmppSessionConfiguration;
 import com.cloudhopper.smpp.SmppSessionCounters;
 import com.cloudhopper.smpp.SmppSessionHandler;
-import com.cloudhopper.smpp.type.SmppTimeoutException;
+import com.cloudhopper.smpp.channel.AwaitChannelFutureListener;
+import com.cloudhopper.smpp.jmx.DefaultSmppSessionMXBean;
 import com.cloudhopper.smpp.pdu.BaseBind;
 import com.cloudhopper.smpp.pdu.BaseBindResp;
 import com.cloudhopper.smpp.pdu.EnquireLink;
@@ -52,23 +67,13 @@ import com.cloudhopper.smpp.transcoder.DefaultPduTranscoderContext;
 import com.cloudhopper.smpp.transcoder.PduTranscoder;
 import com.cloudhopper.smpp.type.RecoverablePduException;
 import com.cloudhopper.smpp.type.SmppBindException;
+import com.cloudhopper.smpp.type.SmppChannelException;
+import com.cloudhopper.smpp.type.SmppTimeoutException;
 import com.cloudhopper.smpp.type.UnrecoverablePduException;
+import com.cloudhopper.smpp.util.EnquireLinkSender;
 import com.cloudhopper.smpp.util.SequenceNumber;
 import com.cloudhopper.smpp.util.SmppSessionUtil;
 import com.cloudhopper.smpp.util.SmppUtil;
-import java.lang.management.ManagementFactory;
-import java.net.InetSocketAddress;
-import java.nio.channels.ClosedChannelException;
-import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import javax.management.ObjectName;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelFuture;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Default implementation of either an ESME or SMSC SMPP session.
@@ -99,6 +104,8 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
     private BaseBindResp preparedBindResponse;
     private ScheduledExecutorService monitorExecutor;
     private DefaultSmppSessionCounters counters;
+    
+    private EnquireLinkSender enquireLinkSender;
 
     /**
      * Creates an SmppSession for a server-based session.
@@ -170,6 +177,10 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
         if (configuration.isCountersEnabled()) {
             this.counters = new DefaultSmppSessionCounters();
         }
+        
+        if (configuration.isAutomaticEnquireLink()) {
+        	this.enquireLinkSender = new EnquireLinkSender(this);
+        }
     }
     
     public void registerMBean(String objectName) {
@@ -216,6 +227,10 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
     protected void setBound() {
         this.state.set(STATE_BOUND);
         this.boundTime.set(System.currentTimeMillis());
+        
+        if (enquireLinkSender != null) {
+        	enquireLinkSender.start();
+        }
     }
 
     @Override
@@ -518,10 +533,14 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
         }
 
         // write the pdu out & wait till its written
-        ChannelFuture channelFuture = this.channel.write(buffer).await();
+        AwaitChannelFutureListener listener = new AwaitChannelFutureListener();
+        ChannelFuture channelFuture = this.channel.write(buffer);
+        channelFuture.addListener(listener);
+        
+        listener.await();
 
         // check if the write was a success
-        if (!channelFuture.isSuccess()) {
+        if (!listener.successed()) {
             // the write failed, make sure to throw an exception
             throw new SmppChannelException(channelFuture.getCause().getMessage(), channelFuture.getCause());
         }
@@ -557,16 +576,19 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
         }
 
         // write the pdu out & wait till its written
-        ChannelFuture channelFuture = this.channel.write(buffer).await();
+        AwaitChannelFutureListener listener = new AwaitChannelFutureListener();
+        ChannelFuture channelFuture = this.channel.write(buffer);
+        channelFuture.addListener(listener);
+        
+        listener.await();
 
         // check if the write was a success
-        if (!channelFuture.isSuccess()) {
+        if (!listener.successed()) {
             // the write failed, make sure to throw an exception
             throw new SmppChannelException(channelFuture.getCause().getMessage(), channelFuture.getCause());
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void firePduReceived(Pdu pdu) {
         if (configuration.getLoggingOptions().isLogPduEnabled()) {

@@ -53,6 +53,9 @@ public class SmppSessionConfiguration extends SmppConnectionConfiguration {
     private long requestExpiryTimeout;
     private long windowMonitorInterval;
     private boolean countersEnabled;
+    
+    private boolean automaticEnquireLink;
+    private long enquireLinkTimer;
 
     public SmppSessionConfiguration() {
         this(SmppBindType.TRANSCEIVER, null, null, null);
@@ -74,6 +77,8 @@ public class SmppSessionConfiguration extends SmppConnectionConfiguration {
         this.windowWaitTimeout = SmppConstants.DEFAULT_WINDOW_WAIT_TIMEOUT;
         this.requestExpiryTimeout = SmppConstants.DEFAULT_REQUEST_EXPIRY_TIMEOUT;
         this.windowMonitorInterval = SmppConstants.DEFAULT_WINDOW_MONITOR_INTERVAL;
+        this.automaticEnquireLink = SmppConstants.DEFAULT_USE_AUTOMATIC_ENQUIRE_LINK;
+        this.enquireLinkTimer = SmppConstants.DEFAULT_ENQUIRE_LINK_TIMER;
         this.countersEnabled = false;
     }
 
@@ -227,5 +232,21 @@ public class SmppSessionConfiguration extends SmppConnectionConfiguration {
     public void setCountersEnabled(boolean countersEnabled) {
         this.countersEnabled = countersEnabled;
     }
+
+	public boolean isAutomaticEnquireLink() {
+		return automaticEnquireLink;
+	}
+
+	public void setAutomaticEnquireLink(boolean automaticEnquireLink) {
+		this.automaticEnquireLink = automaticEnquireLink;
+	}
+
+	public long getEnquireLinkTimer() {
+		return enquireLinkTimer;
+	}
+
+	public void setEnquireLinkTimer(long enquireLinkTimer) {
+		this.enquireLinkTimer = enquireLinkTimer;
+	}
 
 }

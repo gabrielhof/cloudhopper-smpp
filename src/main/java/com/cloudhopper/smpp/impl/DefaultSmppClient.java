@@ -20,20 +20,35 @@ package com.cloudhopper.smpp.impl;
  * #L%
  */
 
-import com.cloudhopper.smpp.SmppClient;
-import com.cloudhopper.smpp.util.DaemonExecutors;
+import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
+import javax.net.ssl.SSLEngine;
+
+import org.jboss.netty.bootstrap.ClientBootstrap;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.group.ChannelGroup;
+import org.jboss.netty.channel.group.DefaultChannelGroup;
+import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
+import org.jboss.netty.handler.ssl.SslHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudhopper.smpp.SmppBindType;
-import com.cloudhopper.smpp.type.SmppChannelException;
+import com.cloudhopper.smpp.SmppClient;
 import com.cloudhopper.smpp.SmppSession;
 import com.cloudhopper.smpp.SmppSessionConfiguration;
 import com.cloudhopper.smpp.SmppSessionHandler;
+import com.cloudhopper.smpp.channel.AwaitChannelFutureListener;
 import com.cloudhopper.smpp.channel.SmppChannelConstants;
-import com.cloudhopper.smpp.type.SmppTimeoutException;
 import com.cloudhopper.smpp.channel.SmppClientConnector;
-import com.cloudhopper.smpp.channel.SmppSessionPduDecoder;
 import com.cloudhopper.smpp.channel.SmppSessionLogger;
-import com.cloudhopper.smpp.channel.SmppSessionWrapper;
+import com.cloudhopper.smpp.channel.SmppSessionPduDecoder;
 import com.cloudhopper.smpp.channel.SmppSessionThreadRenamer;
+import com.cloudhopper.smpp.channel.SmppSessionWrapper;
 import com.cloudhopper.smpp.pdu.BaseBind;
 import com.cloudhopper.smpp.pdu.BaseBindResp;
 import com.cloudhopper.smpp.pdu.BindReceiver;
@@ -45,21 +60,10 @@ import com.cloudhopper.smpp.type.RecoverablePduException;
 import com.cloudhopper.smpp.type.SmppBindException;
 import com.cloudhopper.smpp.type.SmppChannelConnectException;
 import com.cloudhopper.smpp.type.SmppChannelConnectTimeoutException;
+import com.cloudhopper.smpp.type.SmppChannelException;
+import com.cloudhopper.smpp.type.SmppTimeoutException;
 import com.cloudhopper.smpp.type.UnrecoverablePduException;
-import java.net.InetSocketAddress;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import javax.net.ssl.SSLEngine;
-import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.group.ChannelGroup;
-import org.jboss.netty.channel.group.DefaultChannelGroup;
-import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
-import org.jboss.netty.handler.ssl.SslHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.cloudhopper.smpp.util.DaemonExecutors;
 
 /**
  * Default implementation to "bootstrap" client SMPP sessions (create & bind).
@@ -259,22 +263,23 @@ public class DefaultSmppClient implements SmppClient {
         // a socket address used to "bind" to the remote system
         InetSocketAddress socketAddr = new InetSocketAddress(host, port);
 
+        AwaitChannelFutureListener listener = new AwaitChannelFutureListener();
         // attempt to connect to the remote system
         ChannelFuture connectFuture = this.clientBootstrap.connect(socketAddr);
+        connectFuture.addListener(listener);
         
         // wait until the connection is made successfully
-        boolean timeout = !connectFuture.await(connectTimeoutMillis);
+        boolean timeout = listener.timeout(connectTimeoutMillis);
 
         if (timeout) {
             throw new SmppChannelConnectTimeoutException("Unable to connect to host [" + host + "] and port [" + port + "] within " + connectTimeoutMillis + " ms");
         }
 
-        if (!connectFuture.isSuccess()) {
-            throw new SmppChannelConnectException("Unable to connect to host [" + host + "] and port [" + port + "]: " + connectFuture.getCause().getMessage(), connectFuture.getCause());
+        if (!listener.successed()) {
+            throw new SmppChannelConnectException("Unable to connect to host [" + host + "] and port [" + port + "]: " + listener.getCause().getMessage(), listener.getCause());
         }
 
         // if we get here, then we were able to connect and get a channel
-        return connectFuture.getChannel();
+        return listener.getChannel();
     }
-
 }
