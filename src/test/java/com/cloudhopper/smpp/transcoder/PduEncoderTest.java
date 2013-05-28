@@ -21,18 +21,39 @@ package com.cloudhopper.smpp.transcoder;
  */
 
 // third party imports
-import com.cloudhopper.commons.util.HexString;
-import com.cloudhopper.smpp.pdu.*;
-import com.cloudhopper.smpp.type.Address;
-import com.cloudhopper.commons.util.HexUtil;
-import com.cloudhopper.smpp.SmppConstants;
-import com.cloudhopper.smpp.tlv.Tlv;
-import com.cloudhopper.smpp.type.SmppInvalidArgumentException;
-import java.io.UnsupportedEncodingException;
-import org.junit.*;
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.junit.Assert;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.cloudhopper.commons.util.HexUtil;
+import com.cloudhopper.smpp.SmppConstants;
+import com.cloudhopper.smpp.pdu.BindReceiver;
+import com.cloudhopper.smpp.pdu.BindReceiverResp;
+import com.cloudhopper.smpp.pdu.BindTransceiver;
+import com.cloudhopper.smpp.pdu.BindTransceiverResp;
+import com.cloudhopper.smpp.pdu.BindTransmitter;
+import com.cloudhopper.smpp.pdu.BindTransmitterResp;
+import com.cloudhopper.smpp.pdu.BufferHelper;
+import com.cloudhopper.smpp.pdu.CancelSm;
+import com.cloudhopper.smpp.pdu.CancelSmResp;
+import com.cloudhopper.smpp.pdu.DataSm;
+import com.cloudhopper.smpp.pdu.DataSmResp;
+import com.cloudhopper.smpp.pdu.DeliverSm;
+import com.cloudhopper.smpp.pdu.DeliverSmResp;
+import com.cloudhopper.smpp.pdu.EnquireLink;
+import com.cloudhopper.smpp.pdu.EnquireLinkResp;
+import com.cloudhopper.smpp.pdu.GenericNack;
+import com.cloudhopper.smpp.pdu.QuerySm;
+import com.cloudhopper.smpp.pdu.QuerySmResp;
+import com.cloudhopper.smpp.pdu.SubmitSm;
+import com.cloudhopper.smpp.pdu.SubmitSmResp;
+import com.cloudhopper.smpp.pdu.Unbind;
+import com.cloudhopper.smpp.pdu.UnbindResp;
+import com.cloudhopper.smpp.tlv.Tlv;
+import com.cloudhopper.smpp.type.Address;
+import com.cloudhopper.smpp.type.SmppInvalidArgumentException;
 
 // my imports
 
@@ -82,7 +103,7 @@ public class PduEncoderTest {
     }
 
     @Test
-    public void encodeSubmitSmRespWithNoMessageId() throws Exception {
+    public void encodeSubmitSmRespWithNullMessageId() throws Exception {
         SubmitSmResp pdu0 = new SubmitSmResp();
         pdu0.setSequenceNumber(171192033);
 
@@ -90,6 +111,17 @@ public class PduEncoderTest {
         Assert.assertArrayEquals(HexUtil.toByteArray("0000001180000004000000000a342ee100"), BufferHelper.createByteArray(buffer));
     }
 
+    @Test
+    public void encodeSubmitSmRespWithOmittedMesageId() throws Exception {
+        SubmitSmResp pdu0 = new SubmitSmResp();
+        pdu0.setSequenceNumber(171192033);
+        pdu0.setCommandStatus(0x30);
+        pdu0.setCommandLength(16);
+
+        ChannelBuffer buffer = transcoder.encode(pdu0);
+        Assert.assertArrayEquals(HexUtil.toByteArray("0000001080000004000000300a342ee1"), BufferHelper.createByteArray(buffer));
+    }
+    
     @Test
     public void encodeDeliverSmResp() throws Exception {
         DeliverSmResp pdu0 = new DeliverSmResp();
