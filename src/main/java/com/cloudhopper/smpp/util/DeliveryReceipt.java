@@ -412,6 +412,12 @@ public class DeliveryReceipt {
         } else if (stateText.equalsIgnoreCase("ENROUTE")) {
             return SmppConstants.STATE_ENROUTE;
         } else {
+        	for (byte i = SmppConstants.STATE_ENROUTE; i <= SmppConstants.STATE_REJECTED; i++) {
+        		if (String.valueOf(i).equals(stateText)) {
+        			return i;
+        		}
+        	}
+        	
             return -1;
         }
     }
