@@ -469,12 +469,8 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
         }
     }
 
-    /**
-     * Sends a PDU request and gets a PDU response that matches its sequence #.
-     * NOTE: This PDU response may not be the actual response the caller was
-     * expecting, it needs to verify it afterwards.
-     */
-    protected PduResponse sendRequestAndGetResponse(PduRequest requestPdu, long timeoutInMillis) throws RecoverablePduException, UnrecoverablePduException, SmppTimeoutException, SmppChannelException, InterruptedException {
+    @Override
+    public PduResponse sendRequestAndGetResponse(PduRequest requestPdu, long timeoutInMillis) throws RecoverablePduException, UnrecoverablePduException, SmppTimeoutException, SmppChannelException, InterruptedException {
         WindowFuture<Integer,PduRequest,PduResponse> future = sendRequestPdu(requestPdu, timeoutInMillis, true);
         boolean completedWithinTimeout = future.await();
         
